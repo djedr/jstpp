@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 'use strict';
 const fs = require('fs');
 const callable = require('../callable-js');
@@ -81,7 +83,7 @@ const stringifyPartial = (partial) => {
             i = args.index;
             const val = args.match;
 
-            stringified += processMacros(val) + '`';
+            stringified += processMacros(val).output + '`';
 
             lastI = i;
         }
@@ -91,6 +93,12 @@ const stringifyPartial = (partial) => {
     return stringified;
     // change @{x} to `x`
     // if macros should work recursively, it would be @{x} -> `y`, where y = self(x)
+};
+
+const escapeBackticks = str => {
+    str = str.replace(/\\/g, '\\\\');
+    str = str.replace(/\$/g, '\\$');
+    return str.replace(/`/g, '\\`');
 };
 
 var processMacros = (source) => {
@@ -106,9 +114,11 @@ var processMacros = (source) => {
     let compiled = applyRegex(source, macroSpaceRegExp, (source, index, macroName, partial) => {
         const args = matchParens(source, index, '{', '}');
 
+        partial = escapeBackticks(partial);
+
         // macro has the form @x
         if (args === null) {
-            console.log('***');
+            //console.log('***');
             generator += `output += \`${partial}\`;`;
             return { index, value: '***' };
         // macro has the form @{x}
@@ -132,9 +142,13 @@ var processMacros = (source) => {
 
     //generator += `output += \`${source.slice()}\`;`;
 
-    let gen = `(() => { let output = ''; ${generator}; return output; })()`;
-    console.log(gen);
-    return eval(gen);
+    let gen = String.raw`(() => {
+        ${fs.readFileSync(require.resolve('./core-macros.js'), 'utf-8')}
+        let output = '';
+        ${generator}
+        return output;
+    })()`;
+    return { generator: gen, output: eval(gen) };
 };
 
 //const self = callable({args: 'fileName', body: c=> [
@@ -152,8 +166,8 @@ const self = (fileName, onReturn) => {
         _ => fs.readFile(fileName, 'utf-8', funs[1]),
         (err, source) => {
             if (err) throw err;
-            const output = processMacros(source);
-            console.log(output);
+            const { output, generator } = processMacros(source);
+            //console.log(output);
             onReturn(output);
         }
     ];
@@ -161,5 +175,11 @@ const self = (fileName, onReturn) => {
 };
 
 module.exports = self;
+
+if (require.main === module) {
+    //const argsString = '[' + process.argv.slice(2).join('') + ']';
+    //const args = JSON.parse(argsString);
+    self(process.argv[2], ret => console.log(ret));
+}
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements

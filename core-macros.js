@@ -1,3 +1,16 @@
+const _ = '@';
+
+const escapeTemplate = str => {
+    str = str.replace(/\\/g, '\\\\');
+    str = str.replace(/\$/g, '\\$');
+    return str.replace(/`/g, '\\`');
+};
+
+const escapeRawTemplate = str => {
+    str = str.replace(/\$/g, '\\$');
+    return str.replace(/`/g, '\\`');
+};
+
 function include(fileName) {
     const fs = require('fs');
 
@@ -10,6 +23,10 @@ function include(fileName) {
 function toIdentifier(name) {
     // todo: implement properly
     return name.replace(/-/g, '_');
+}
+
+function npmInit() {
+    // todo: `npm init -f`
 }
 
 function grab({
@@ -29,10 +46,10 @@ function grab({
         // install only if not already installed
         // todo: support version bumping
         const moduleVersion = so.slice(0, -1);
-        console.log(module, moduleVersion);
+        //console.log(module, moduleVersion);
         if (moduleVersion === 'missing') {
             const command = `npm install ${save? `--save${dev? '-dev': ''}`: ''} ${module}`;
-            console.log('***\n', command, '\n***');
+            //console.log('***\n', command, '\n***');
             [exec(command)].map(c => {
                 c.stdout.pipe(process.stdout);
                 c.stderr.pipe(process.stderr);
@@ -41,4 +58,42 @@ function grab({
     });
 
     return `const ${alias} = require('${module}');`;
+}
+
+function take({
+        module = '',
+        alias = toIdentifier(module),
+        save = true,
+        dev = false,
+        onReturn = null,
+        async = false // if true, this returns a promise resolved when the module is installed
+    }) {
+    const exec = require('child_process').exec;
+    const path = require('path');
+    if (module === '') throw Error('Module name is required!');
+
+    // todo: make it possible to be async by returning a promise or accepting a callback
+    const cwd = path.resolve(`${process.env.HOME}/.jstpp/modules`);
+    //console.log(cwd);
+
+    exec(`mkdir -p ${cwd}`);
+
+    exec(`node -p "try { require('${module}/package.json').version } catch (e) { 'missing' }"`,
+    { cwd },
+    (e, so, se) => {
+        // install only if not already installed
+        // todo: support version bumping
+        const moduleVersion = so.slice(0, -1);
+        //console.log(module, moduleVersion);
+        if (moduleVersion === 'missing') {
+            const command = `npm install ${module}`;
+            //console.log('***\n', command, '\n***');
+            [exec(command, { cwd })].map(c => {
+                c.stdout.pipe(process.stdout);
+                c.stderr.pipe(process.stderr);
+            });
+        }
+    });
+
+    return `const ${alias} = require('${cwd}/node_modules/${module}');`;
 }
