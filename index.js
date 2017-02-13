@@ -2,7 +2,6 @@
 
 'use strict';
 const fs = require('fs');
-const callable = require('../callable-js');
 
 // 2 passes:
 // 1st: collect definitions
