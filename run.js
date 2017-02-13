@@ -6,9 +6,10 @@ const exec = require('child_process').exec;
 
 jstpp(process.argv[2], ret => {
     fs.writeFile('_jstpp_temp_.js', ret, e => {
-        exec('node _jstpp_temp_.js', (e, so, se) => {
-            console.log(so, se);
+        const p = exec('node _jstpp_temp_.js', (e, so, se) => {
             exec('rm _jstpp_temp_.js', (e, so, se) => console.log(so, se));
         });
+        p.pipe.stdout(process.stdout);
+        p.pipe.stderr(process.stderr);
     });
 });
