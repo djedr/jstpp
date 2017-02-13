@@ -9,7 +9,7 @@ jstpp(process.argv[2], ret => {
         const p = exec('node _jstpp_temp_.js', (e, so, se) => {
             exec('rm _jstpp_temp_.js', (e, so, se) => console.log(so, se));
         });
-        p.pipe.stdout(process.stdout);
-        p.pipe.stderr(process.stderr);
+        p.stdout.pipe(process.stdout);
+        p.stderr.pipe(process.stderr);
     });
 });
