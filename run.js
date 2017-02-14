@@ -6,7 +6,7 @@ const exec = require('child_process').exec;
 
 jstpp(process.argv[2], ret => {
     fs.writeFile('_jstpp_temp_.js', ret, e => {
-        const p = exec('node _jstpp_temp_.js', (e, so, se) => {
+        const p = exec('FORCE_COLOR=true node _jstpp_temp_.js', (e, so, se) => {
             exec('rm _jstpp_temp_.js', (e, so, se) => console.log(so, se));
         });
         p.stdout.pipe(process.stdout);

@@ -66,7 +66,8 @@ function take({
         save = true,
         dev = false,
         onReturn = null,
-        async = false // if true, this returns a promise resolved when the module is installed
+        async = false, // if true, this returns a promise resolved when the module is installed
+        suffix = ''
     }) {
     const exec = require('child_process').exec;
     const path = require('path');
@@ -95,5 +96,5 @@ function take({
         }
     });
 
-    return `const ${alias} = require('${cwd}/node_modules/${module}');`;
+    return `const ${alias} = require('${cwd}/node_modules/${module}${suffix}');`;
 }
