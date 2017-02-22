@@ -29,6 +29,11 @@ function npmInit() {
     // todo: `npm init -f`
 }
 
+function simpleScript() {
+    // todo
+    return '';
+}
+
 function grab({
         module = '',
         alias = toIdentifier(module),
@@ -60,6 +65,7 @@ function grab({
     return `const ${alias} = require('${module}');`;
 }
 
+// todo: integrate with grab. Add simpleScript, which will change global defaults (e.g. grab will download modules to ~/.jstpp/modules).
 function take({
         module = '',
         alias = toIdentifier(module),

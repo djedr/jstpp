@@ -1,5 +1,6 @@
 #!/usr/bin/env ../run.js
 
+//@{simpleScript()}
 @{take({module: 'lodash', alias: '_'})}
 @{take({module: 'colors'})}
 @{take({module: 'moment'})}
