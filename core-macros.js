@@ -104,3 +104,30 @@ function take({
 
     return `const ${alias} = require('${cwd}/node_modules/${module}${suffix}');`;
 }
+
+const revise = (pathStr, value) => {
+    let path = pathStr.split('.');
+    const object = path[0];
+    path = path.slice(1);
+
+    let pathAcc = '';
+    const lastPathId = path.length - 1;
+
+    const pathUpTo = i => {
+        return object + '.' + path.slice(0, i + 1).join('.');
+    };
+
+    for (let i = 0; i < lastPathId; ++i) {
+        pathAcc += `{ ${path[i]}: Object.assign(${pathUpTo(i)}, `;
+    }
+
+    pathAcc += `{ ${path[lastPathId]}: ${value}`;
+
+    for (let i = 0; i < lastPathId; ++i) {
+        pathAcc += ` })`;
+    }
+
+    pathAcc += ` }`;
+
+    return `Object.assign({}, ${object}, ${pathAcc})`;
+}

@@ -7,11 +7,15 @@ const fs = require('fs');
 // 1st: collect definitions
 // 2nd: perform substitutions
 
+// TODO: the @ should be parametrizable
+const identifierRegExp = /^([a-zA-Z_$][0-9a-zA-Z_$]*)/gmu;
+const macroSpaceRegExp = /@\s*/gmu;
+
 // index is the index of the opening paren
 function matchParens(source, index, open, close) {
-    let count = 1, match = '';
+    let count = 1, value = '';
 
-    if (source[index] !== open) return null;
+    if (source[index] !== open) return Promise.resolve({ index, value: null });
 
     // this works on multiple lines
     // so we slice source and not line
@@ -22,30 +26,66 @@ function matchParens(source, index, open, close) {
         else if (ch === open) ++count;
 
         if (count === 0) {
-            index = i + 1;
-            // returned index is the index of closing paren
-            // match is the stuff between parens, excluding themselves
-            return { index, match };
+            // returned index is the index of the character after the closing paren
+            // value is the stuff between parens, excluding themselves
+            return Promise.resolve({ index: i + 1, value });
         }
 
         // doesn't include outer ( and ):
-        match += ch;
+        value += ch;
     }
 
-    return null;
+    return Promise.resolve({ index, value: null });
+}
+
+// todo: ditch the regexps
+function isLetter(ch) {
+    return /[a-zA-Z]/.test(ch);
+}
+
+function isUnderscoreOrDollar(ch) {
+    return /\$_/.test(ch);
+}
+
+function isNumber(ch) {
+    return /[0-9]/.test(ch);
+}
+
+function matchIdentifier(source, index) {
+    let value = '';
+
+    const firstCh = source[index];
+
+    if (!isLetter(firstCh) && !isUnderscoreOrDollar(firstCh))
+        return Promise.reject(`Expected identifier at ${index}!`);
+
+    value += firstCh;
+
+    for (let i = index + 1; i < source.length; ++i) {
+        const ch = source[i];
+        if (!isLetter(ch) && !isUnderscoreOrDollar(ch) && !isNumber(ch))
+            return Promise.resolve({value, index: i});
+        value += ch;
+    }
+
+    return Promise.resolve({value, index});
 }
 
 // returns index of the first nonspace character
 function eatSpace(source, index) {
+    let value = '';
     for (let i = index; i < source.length; ++i) {
         let ch = source[i];
         if (!' \n\t\v'.includes(ch)) {
-            return i;
+            return Promise.resolve({index: i, value});
         }
+        value += ch;
     }
-    return index;
+    return Promise.resolve({index, value});
 }
 
+// todo: make this async
+// cb returns a promise
 function applyRegex(source, regExp, cb) {
     let matches, result = '', partial = '';
     let lastEndIndex = 0;
@@ -103,40 +143,35 @@ const escapeBackticks = str => {
 var processMacros = (source) => {
     let macros = [];
 
-    // TODO: the @ should be parametrizable
-    const macroDefRegExp = /^\s*@\s*function\s+([a-zA-Z_$]*)\s*/gmu;
-    const macroInvRegExp = /@\s*([a-zA-Z_$]*)\s*/gmu;
-    const macroSpaceRegExp = /@\s*/gmu;
-
     let generator = '';
 
     let compiled = applyRegex(source, macroSpaceRegExp, (source, index, macroName, partial) => {
-        const args = matchParens(source, index, '{', '}');
-
         partial = escapeBackticks(partial);
 
-        // macro has the form @x
-        if (args === null) {
-            //console.log('***');
-            generator += `output += \`${partial}\`;`;
+        let expr = '';
+        const alt = ({value, index}) => matchIdentifier(source, index)
+        .then(({value, index}) => { expr += value; return eatSpace(source, index); })
+        .then(({value, index}) => matchParens(source, index, '(', ')'))
+        .then(({value, index}) => {
+            expr += `(${value})`;
+            const strValue = stringifyPartial(expr);
+            generator += `output += \`${partial}\${${strValue}}\`;\n\n`;
             return { index, value: '***' };
-        // macro has the form @{x}
-        } else {
-            index = args.index;
-        }
+        });
 
-        let val = args.match;
+        return matchParens(source, index, '{', '}')
+        .then(({value, index}) => {
+            const strValue = stringifyPartial(value);
 
-        //console.log('P', partial, 'V', val)
-        val = stringifyPartial(val);
-        //console.log('SV', val);
-        if (/\s*((async\s+)?function\*?)|const|var|let|class|if\s+/.test(val)) {
-            generator += `output += \`${partial}\`;\n\n${val}\n\n`;
-        } else {
-            generator += `output += \`${partial}\${${val}}\`;\n\n`;
-        }
+            if (/\s*((async\s+)?function\*?)|const|var|let|class|if\s+/.test(strValue)) {
+                generator += `output += \`${partial}\`;\n\n${strValue}\n\n`;
+            } else {
+                generator += `output += \`${partial}\${${strValue}}\`;\n\n`;
+            }
 
-        return { index, value: '***' };
+            return { index, value: '***' };
+        })
+        .catch(({value, index}) => alt({value, index}));
     });
 
     //generator += `output += \`${source.slice()}\`;`;
@@ -182,3 +217,6 @@ if (require.main === module) {
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements
+
+// todo: make async work; async macros
+// alternative (dual-like) syntax
